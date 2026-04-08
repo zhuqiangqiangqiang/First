@@ -1,17 +1,29 @@
 # Moquan IoT 能力实现
 
-已实现你要的五项能力：
+已扩展为“常用控制 + 常用读取”全套方法封装：
 
-0. 创建 API Key (`create_api_key`)
-1. 灯光控制 (`control_light`)
-2. 环境信息读取 (`read_environment_info`)
-3. 水肥控制 (`control_water_fertilizer`)
-4. 水肥信息读取 (`read_water_fertilizer_info`)
+## API Key 管理
+- 创建 API Key：`create_api_key`
+- 查询 API Key 列表：`list_api_keys`
+- 吊销 API Key：`revoke_api_key`
+
+## 灯光
+- 控制：`control_light`
+- 读取：`read_light_info`
+
+## 环境
+- 控制：`control_environment`
+- 读取传感器数据：`read_environment_info`
+- 读取控制配置/状态：`read_environment_control_info`
+
+## 水肥
+- 控制：`control_water_fertilizer`
+- 读取：`read_water_fertilizer_info`
 
 ## 文件说明
 
 - `moquan_client.py`: API 客户端实现。
-- `example_usage.py`: 五项能力的示例调用。
+- `example_usage.py`: 全量能力调用示例。
 
 ## 快速使用
 
@@ -21,17 +33,22 @@ python3 example_usage.py
 
 你需要把 `example_usage.py` 里的 `YOUR_ADMIN_OR_APP_TOKEN` 替换成实际 token。
 
-## 接口路径可配置
-
-默认路径如下：
+## 默认接口路径
 
 - `/api/v1/apikey/create`
+- `/api/v1/apikey/list`
+- `/api/v1/apikey/revoke`
 - `/api/v1/light/control`
+- `/api/v1/light/read`
+- `/api/v1/environment/control`
 - `/api/v1/environment/read`
+- `/api/v1/environment/control/read`
 - `/api/v1/water-fertilizer/control`
 - `/api/v1/water-fertilizer/read`
 
-若你在平台文档中的路径不同，可以在初始化时传入 `EndpointConfig` 覆盖。
+## 路径覆盖（按文档适配）
+
+如果你的平台文档接口路径不同，使用 `EndpointConfig` 覆盖：
 
 ```python
 from moquan_client import MoquanClient, EndpointConfig
@@ -40,11 +57,8 @@ client = MoquanClient(
     base_url="https://developers.moquan.live:9090",
     token="YOUR_TOKEN",
     endpoint_config=EndpointConfig(
-        apikey_create="/your/apikey/create/path",
-        light_control="/your/light/path",
-        environment_read="/your/environment/path",
-        water_fertilizer_control="/your/wf/control/path",
-        water_fertilizer_read="/your/wf/read/path",
+        environment_control="/your/environment/control/path",
+        environment_control_read="/your/environment/control/read/path",
     ),
 )
 ```

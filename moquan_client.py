@@ -1,11 +1,10 @@
 """Moquan IoT API client.
 
-该客户端封装了以下能力：
-1. 创建 API Key
-2. 灯光控制
-3. 环境信息读取
-4. 水肥控制
-5. 水肥信息读取
+该客户端封装了常用控制和数据读取能力：
+1. API Key 管理（创建 / 查询 / 吊销）
+2. 灯光控制与状态读取
+3. 环境控制与环境信息读取
+4. 水肥控制与信息读取
 
 说明：
 - 由于运行环境可能无法直接访问目标地址，接口路径允许按实际文档覆盖。
@@ -28,8 +27,16 @@ class EndpointConfig:
     """Endpoint paths for Moquan API."""
 
     apikey_create: str = "/api/v1/apikey/create"
+    apikey_list: str = "/api/v1/apikey/list"
+    apikey_revoke: str = "/api/v1/apikey/revoke"
+
     light_control: str = "/api/v1/light/control"
+    light_read: str = "/api/v1/light/read"
+
+    environment_control: str = "/api/v1/environment/control"
     environment_read: str = "/api/v1/environment/read"
+    environment_control_read: str = "/api/v1/environment/control/read"
+
     water_fertilizer_control: str = "/api/v1/water-fertilizer/control"
     water_fertilizer_read: str = "/api/v1/water-fertilizer/read"
 
@@ -49,6 +56,9 @@ class MoquanClient:
         self.timeout = timeout
         self.endpoint_config = endpoint_config or EndpointConfig()
 
+    # -------------------------------
+    # API KEY
+    # -------------------------------
     def create_api_key(
         self,
         *,
@@ -56,7 +66,7 @@ class MoquanClient:
         permissions: list[str] | None = None,
         expires_at: str | None = None,
     ) -> dict[str, Any]:
-        """创建新的 API Key。expires_at 建议使用 ISO8601，例如 2026-12-31T23:59:59Z。"""
+        """创建新的 API Key。expires_at 建议 ISO8601，例如 2026-12-31T23:59:59Z。"""
         payload: dict[str, Any] = {"name": name}
         if permissions is not None:
             payload["permissions"] = permissions
@@ -64,6 +74,25 @@ class MoquanClient:
             payload["expiresAt"] = expires_at
         return self._request("POST", self.endpoint_config.apikey_create, payload)
 
+    def list_api_keys(self, *, page: int = 1, page_size: int = 20) -> dict[str, Any]:
+        """读取 API Key 列表。"""
+        return self._request(
+            "GET",
+            self.endpoint_config.apikey_list,
+            query={"page": page, "pageSize": page_size},
+        )
+
+    def revoke_api_key(self, *, api_key_id: str) -> dict[str, Any]:
+        """吊销 API Key。"""
+        return self._request(
+            "POST",
+            self.endpoint_config.apikey_revoke,
+            payload={"apiKeyId": api_key_id},
+        )
+
+    # -------------------------------
+    # LIGHT
+    # -------------------------------
     def control_light(
         self,
         *,
@@ -83,14 +112,69 @@ class MoquanClient:
             payload["colorTemp"] = color_temp
         return self._request("POST", self.endpoint_config.light_control, payload)
 
+    def read_light_info(self, *, device_id: str) -> dict[str, Any]:
+        """读取灯光状态与参数。"""
+        return self._request(
+            "GET",
+            self.endpoint_config.light_read,
+            query={"deviceId": device_id},
+        )
+
+    # -------------------------------
+    # ENVIRONMENT
+    # -------------------------------
+    def control_environment(
+        self,
+        *,
+        device_id: str,
+        mode: str | None = None,
+        target_temperature: float | None = None,
+        target_humidity: float | None = None,
+        target_co2: int | None = None,
+        fan_on: bool | None = None,
+        heater_on: bool | None = None,
+        humidifier_on: bool | None = None,
+        dehumidifier_on: bool | None = None,
+    ) -> dict[str, Any]:
+        """环境控制：支持模式、目标值和执行器开关。"""
+        payload: dict[str, Any] = {"deviceId": device_id}
+        if mode is not None:
+            payload["mode"] = mode
+        if target_temperature is not None:
+            payload["targetTemperature"] = target_temperature
+        if target_humidity is not None:
+            payload["targetHumidity"] = target_humidity
+        if target_co2 is not None:
+            payload["targetCO2"] = target_co2
+        if fan_on is not None:
+            payload["fan"] = "on" if fan_on else "off"
+        if heater_on is not None:
+            payload["heater"] = "on" if heater_on else "off"
+        if humidifier_on is not None:
+            payload["humidifier"] = "on" if humidifier_on else "off"
+        if dehumidifier_on is not None:
+            payload["dehumidifier"] = "on" if dehumidifier_on else "off"
+        return self._request("POST", self.endpoint_config.environment_control, payload)
+
     def read_environment_info(self, *, device_id: str) -> dict[str, Any]:
-        """读取环境信息，例如温湿度、光照、CO2 等。"""
+        """读取环境传感信息，例如温湿度、光照、CO2 等。"""
         return self._request(
             "GET",
             self.endpoint_config.environment_read,
             query={"deviceId": device_id},
         )
 
+    def read_environment_control_info(self, *, device_id: str) -> dict[str, Any]:
+        """读取环境控制配置和当前控制执行状态。"""
+        return self._request(
+            "GET",
+            self.endpoint_config.environment_control_read,
+            query={"deviceId": device_id},
+        )
+
+    # -------------------------------
+    # WATER FERTILIZER
+    # -------------------------------
     def control_water_fertilizer(
         self,
         *,
