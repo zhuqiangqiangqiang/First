@@ -1,6 +1,10 @@
 # Moquan IoT 能力实现
 
-已扩展为“常用控制 + 常用读取”全套方法封装：
+已扩展为“常用控制 + 常用读取 + 设备获取”全套方法封装。
+
+## 设备获取（你提到缺失的部分）
+- 获取设备列表：`list_devices`
+- 获取设备详情：`get_device_detail`
 
 ## API Key 管理
 - 创建 API Key：`create_api_key`
@@ -38,6 +42,8 @@ python3 example_usage.py
 - `/api/v1/apikey/create`
 - `/api/v1/apikey/list`
 - `/api/v1/apikey/revoke`
+- `/api/v1/device/list`
+- `/api/v1/device/detail`
 - `/api/v1/light/control`
 - `/api/v1/light/read`
 - `/api/v1/environment/control`
@@ -57,6 +63,8 @@ client = MoquanClient(
     base_url="https://developers.moquan.live:9090",
     token="YOUR_TOKEN",
     endpoint_config=EndpointConfig(
+        device_list="/your/device/list/path",
+        device_detail="/your/device/detail/path",
         environment_control="/your/environment/control/path",
         environment_control_read="/your/environment/control/read/path",
     ),

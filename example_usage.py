@@ -7,7 +7,12 @@ def main() -> None:
         token="YOUR_ADMIN_OR_APP_TOKEN",
     )
 
-    # 0) API Key 管理
+    # 0) 设备获取（你提到的“获取设备接口”）
+    print("list_devices =>", client.list_devices(page=1, page_size=20))
+    print("list_devices(light) =>", client.list_devices(device_type="light"))
+    print("get_device_detail =>", client.get_device_detail(device_id="env-001"))
+
+    # 1) API Key 管理
     created_key = client.create_api_key(
         name="greenhouse-automation",
         permissions=[
@@ -24,11 +29,14 @@ def main() -> None:
     print("create_api_key =>", created_key)
     print("list_api_keys =>", client.list_api_keys(page=1, page_size=10))
 
-    # 1) 灯光控制 + 状态读取
-    print("control_light =>", client.control_light(device_id="light-001", power=True, brightness=80))
+    # 2) 灯光控制 + 状态读取
+    print(
+        "control_light =>",
+        client.control_light(device_id="light-001", power=True, brightness=80),
+    )
     print("read_light_info =>", client.read_light_info(device_id="light-001"))
 
-    # 2) 环境控制 + 传感器/控制信息读取
+    # 3) 环境控制 + 传感器/控制信息读取
     print(
         "control_environment =>",
         client.control_environment(
@@ -49,7 +57,7 @@ def main() -> None:
         client.read_environment_control_info(device_id="env-001"),
     )
 
-    # 3) 水肥控制 + 信息读取
+    # 4) 水肥控制 + 信息读取
     print(
         "control_water_fertilizer =>",
         client.control_water_fertilizer(
@@ -64,7 +72,7 @@ def main() -> None:
         client.read_water_fertilizer_info(device_id="wf-001"),
     )
 
-    # 4) 吊销 API Key（按需执行）
+    # 5) 吊销 API Key（按需执行）
     # print("revoke_api_key =>", client.revoke_api_key(api_key_id="YOUR_API_KEY_ID"))
 
 

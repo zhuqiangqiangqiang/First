@@ -2,9 +2,10 @@
 
 该客户端封装了常用控制和数据读取能力：
 1. API Key 管理（创建 / 查询 / 吊销）
-2. 灯光控制与状态读取
-3. 环境控制与环境信息读取
-4. 水肥控制与信息读取
+2. 设备查询（设备列表 / 设备详情）
+3. 灯光控制与状态读取
+4. 环境控制与环境信息读取
+5. 水肥控制与信息读取
 
 说明：
 - 由于运行环境可能无法直接访问目标地址，接口路径允许按实际文档覆盖。
@@ -29,6 +30,9 @@ class EndpointConfig:
     apikey_create: str = "/api/v1/apikey/create"
     apikey_list: str = "/api/v1/apikey/list"
     apikey_revoke: str = "/api/v1/apikey/revoke"
+
+    device_list: str = "/api/v1/device/list"
+    device_detail: str = "/api/v1/device/detail"
 
     light_control: str = "/api/v1/light/control"
     light_read: str = "/api/v1/light/read"
@@ -88,6 +92,33 @@ class MoquanClient:
             "POST",
             self.endpoint_config.apikey_revoke,
             payload={"apiKeyId": api_key_id},
+        )
+
+    # -------------------------------
+    # DEVICES
+    # -------------------------------
+    def list_devices(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+        device_type: str | None = None,
+        keyword: str | None = None,
+    ) -> dict[str, Any]:
+        """获取设备列表，可按设备类型与关键字筛选。"""
+        query: dict[str, Any] = {"page": page, "pageSize": page_size}
+        if device_type is not None:
+            query["deviceType"] = device_type
+        if keyword is not None:
+            query["keyword"] = keyword
+        return self._request("GET", self.endpoint_config.device_list, query=query)
+
+    def get_device_detail(self, *, device_id: str) -> dict[str, Any]:
+        """获取单个设备详情。"""
+        return self._request(
+            "GET",
+            self.endpoint_config.device_detail,
+            query={"deviceId": device_id},
         )
 
     # -------------------------------
