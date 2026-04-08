@@ -1,72 +1,44 @@
-# Moquan IoT 能力实现
+# Moquan IoT 客户端（按文档可覆盖路径）
 
-已扩展为“常用控制 + 常用读取 + 设备获取”全套方法封装。
+你反馈“接口地址不对”后，这版做了两件事：
 
-## 设备获取（你提到缺失的部分）
-- 获取设备列表：`list_devices`
-- 获取设备详情：`get_device_detail`
+1. **每个接口支持多候选路径自动尝试**（`/xxx`、`/api/xxx`、`/api/v1/xxx`）。
+2. **支持用 `EndpointConfig` 强制覆盖**，把你文档中的真实路径放第一位。
 
-## API Key 管理
-- 创建 API Key：`create_api_key`
-- 查询 API Key 列表：`list_api_keys`
-- 吊销 API Key：`revoke_api_key`
+> 强烈建议：以官方文档为准，把真实路径写入 `EndpointConfig`，避免猜测路径。
 
-## 灯光
-- 控制：`control_light`
-- 读取：`read_light_info`
+## 安全说明
 
-## 环境
-- 控制：`control_environment`
-- 读取传感器数据：`read_environment_info`
-- 读取控制配置/状态：`read_environment_control_info`
+- 不要把 token 硬编码进代码仓库。
+- 示例改成从环境变量读取：`MOQUAN_TOKEN`。
 
-## 水肥
-- 控制：`control_water_fertilizer`
-- 读取：`read_water_fertilizer_info`
+## 设备接口（已补齐）
 
-## 文件说明
+- 设备列表：`list_devices`
+- 设备详情：`get_device_detail`
 
-- `moquan_client.py`: API 客户端实现。
-- `example_usage.py`: 全量能力调用示例。
-
-## 快速使用
+## 示例运行
 
 ```bash
+export MOQUAN_TOKEN='你的token'
 python3 example_usage.py
 ```
 
-你需要把 `example_usage.py` 里的 `YOUR_ADMIN_OR_APP_TOKEN` 替换成实际 token。
-
-## 默认接口路径
-
-- `/api/v1/apikey/create`
-- `/api/v1/apikey/list`
-- `/api/v1/apikey/revoke`
-- `/api/v1/device/list`
-- `/api/v1/device/detail`
-- `/api/v1/light/control`
-- `/api/v1/light/read`
-- `/api/v1/environment/control`
-- `/api/v1/environment/read`
-- `/api/v1/environment/control/read`
-- `/api/v1/water-fertilizer/control`
-- `/api/v1/water-fertilizer/read`
-
-## 路径覆盖（按文档适配）
-
-如果你的平台文档接口路径不同，使用 `EndpointConfig` 覆盖：
+## 按文档覆盖路径示例
 
 ```python
-from moquan_client import MoquanClient, EndpointConfig
+from moquan_client import EndpointConfig, MoquanClient
 
 client = MoquanClient(
     base_url="https://developers.moquan.live:9090",
     token="YOUR_TOKEN",
     endpoint_config=EndpointConfig(
-        device_list="/your/device/list/path",
-        device_detail="/your/device/detail/path",
-        environment_control="/your/environment/control/path",
-        environment_control_read="/your/environment/control/read/path",
+        # 文档真实地址放第一位
+        device_list=["/open/device/list"],
+        device_detail=["/open/device/detail"],
+        light_control=["/open/light/control"],
+        environment_control=["/open/environment/control"],
+        water_fertilizer_control=["/open/water-fertilizer/control"],
     ),
 )
 ```

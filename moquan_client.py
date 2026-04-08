@@ -1,19 +1,14 @@
 """Moquan IoT API client.
 
-该客户端封装了常用控制和数据读取能力：
-1. API Key 管理（创建 / 查询 / 吊销）
-2. 设备查询（设备列表 / 设备详情）
-3. 灯光控制与状态读取
-4. 环境控制与环境信息读取
-5. 水肥控制与信息读取
-
 说明：
-- 由于运行环境可能无法直接访问目标地址，接口路径允许按实际文档覆盖。
+- 你反馈“文档地址不对”后，本实现改为“多候选路径 + 可覆盖路径”模式：
+  每个能力会按候选路径依次尝试，或者优先使用你传入的 endpoint 覆盖。
+- 建议仍以官方文档为准，通过 EndpointConfig 显式覆盖路径。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from typing import Any
 from urllib import error, parse, request
@@ -25,29 +20,71 @@ class MoquanAPIError(RuntimeError):
 
 @dataclass
 class EndpointConfig:
-    """Endpoint paths for Moquan API."""
+    """Endpoint paths for Moquan API.
 
-    apikey_create: str = "/api/v1/apikey/create"
-    apikey_list: str = "/api/v1/apikey/list"
-    apikey_revoke: str = "/api/v1/apikey/revoke"
+    每个字段是“候选路径列表”，客户端会从前到后尝试。
+    如果你确认文档路径，请把正确路径放在列表第一位。
+    """
 
-    device_list: str = "/api/v1/device/list"
-    device_detail: str = "/api/v1/device/detail"
+    apikey_create: list[str] = field(
+        default_factory=lambda: ["/apikey/create", "/api/apikey/create", "/api/v1/apikey/create"]
+    )
+    apikey_list: list[str] = field(
+        default_factory=lambda: ["/apikey/list", "/api/apikey/list", "/api/v1/apikey/list"]
+    )
+    apikey_revoke: list[str] = field(
+        default_factory=lambda: ["/apikey/revoke", "/api/apikey/revoke", "/api/v1/apikey/revoke"]
+    )
 
-    light_control: str = "/api/v1/light/control"
-    light_read: str = "/api/v1/light/read"
+    device_list: list[str] = field(
+        default_factory=lambda: ["/device/list", "/api/device/list", "/api/v1/device/list"]
+    )
+    device_detail: list[str] = field(
+        default_factory=lambda: ["/device/detail", "/api/device/detail", "/api/v1/device/detail"]
+    )
 
-    environment_control: str = "/api/v1/environment/control"
-    environment_read: str = "/api/v1/environment/read"
-    environment_control_read: str = "/api/v1/environment/control/read"
+    light_control: list[str] = field(
+        default_factory=lambda: ["/light/control", "/api/light/control", "/api/v1/light/control"]
+    )
+    light_read: list[str] = field(
+        default_factory=lambda: ["/light/read", "/api/light/read", "/api/v1/light/read"]
+    )
 
-    water_fertilizer_control: str = "/api/v1/water-fertilizer/control"
-    water_fertilizer_read: str = "/api/v1/water-fertilizer/read"
+    environment_control: list[str] = field(
+        default_factory=lambda: [
+            "/environment/control",
+            "/api/environment/control",
+            "/api/v1/environment/control",
+        ]
+    )
+    environment_read: list[str] = field(
+        default_factory=lambda: ["/environment/read", "/api/environment/read", "/api/v1/environment/read"]
+    )
+    environment_control_read: list[str] = field(
+        default_factory=lambda: [
+            "/environment/control/read",
+            "/api/environment/control/read",
+            "/api/v1/environment/control/read",
+        ]
+    )
+
+    water_fertilizer_control: list[str] = field(
+        default_factory=lambda: [
+            "/water-fertilizer/control",
+            "/api/water-fertilizer/control",
+            "/api/v1/water-fertilizer/control",
+        ]
+    )
+    water_fertilizer_read: list[str] = field(
+        default_factory=lambda: [
+            "/water-fertilizer/read",
+            "/api/water-fertilizer/read",
+            "/api/v1/water-fertilizer/read",
+        ]
+    )
 
 
 class MoquanClient:
-    """Simple HTTP client for Moquan developer API."""
-
     def __init__(
         self,
         base_url: str,
@@ -60,100 +97,42 @@ class MoquanClient:
         self.timeout = timeout
         self.endpoint_config = endpoint_config or EndpointConfig()
 
-    # -------------------------------
-    # API KEY
-    # -------------------------------
-    def create_api_key(
-        self,
-        *,
-        name: str,
-        permissions: list[str] | None = None,
-        expires_at: str | None = None,
-    ) -> dict[str, Any]:
-        """创建新的 API Key。expires_at 建议 ISO8601，例如 2026-12-31T23:59:59Z。"""
+    def create_api_key(self, *, name: str, permissions: list[str] | None = None, expires_at: str | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {"name": name}
         if permissions is not None:
             payload["permissions"] = permissions
         if expires_at is not None:
             payload["expiresAt"] = expires_at
-        return self._request("POST", self.endpoint_config.apikey_create, payload)
+        return self._request_any("POST", self.endpoint_config.apikey_create, payload=payload)
 
     def list_api_keys(self, *, page: int = 1, page_size: int = 20) -> dict[str, Any]:
-        """读取 API Key 列表。"""
-        return self._request(
-            "GET",
-            self.endpoint_config.apikey_list,
-            query={"page": page, "pageSize": page_size},
-        )
+        return self._request_any("GET", self.endpoint_config.apikey_list, query={"page": page, "pageSize": page_size})
 
     def revoke_api_key(self, *, api_key_id: str) -> dict[str, Any]:
-        """吊销 API Key。"""
-        return self._request(
-            "POST",
-            self.endpoint_config.apikey_revoke,
-            payload={"apiKeyId": api_key_id},
-        )
+        return self._request_any("POST", self.endpoint_config.apikey_revoke, payload={"apiKeyId": api_key_id})
 
-    # -------------------------------
-    # DEVICES
-    # -------------------------------
-    def list_devices(
-        self,
-        *,
-        page: int = 1,
-        page_size: int = 50,
-        device_type: str | None = None,
-        keyword: str | None = None,
-    ) -> dict[str, Any]:
-        """获取设备列表，可按设备类型与关键字筛选。"""
+    def list_devices(self, *, page: int = 1, page_size: int = 50, device_type: str | None = None, keyword: str | None = None) -> dict[str, Any]:
         query: dict[str, Any] = {"page": page, "pageSize": page_size}
-        if device_type is not None:
+        if device_type:
             query["deviceType"] = device_type
-        if keyword is not None:
+        if keyword:
             query["keyword"] = keyword
-        return self._request("GET", self.endpoint_config.device_list, query=query)
+        return self._request_any("GET", self.endpoint_config.device_list, query=query)
 
     def get_device_detail(self, *, device_id: str) -> dict[str, Any]:
-        """获取单个设备详情。"""
-        return self._request(
-            "GET",
-            self.endpoint_config.device_detail,
-            query={"deviceId": device_id},
-        )
+        return self._request_any("GET", self.endpoint_config.device_detail, query={"deviceId": device_id})
 
-    # -------------------------------
-    # LIGHT
-    # -------------------------------
-    def control_light(
-        self,
-        *,
-        device_id: str,
-        power: bool,
-        brightness: int | None = None,
-        color_temp: int | None = None,
-    ) -> dict[str, Any]:
-        """控制灯光开关和可选亮度/色温。"""
-        payload: dict[str, Any] = {
-            "deviceId": device_id,
-            "power": "on" if power else "off",
-        }
+    def control_light(self, *, device_id: str, power: bool, brightness: int | None = None, color_temp: int | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"deviceId": device_id, "power": "on" if power else "off"}
         if brightness is not None:
             payload["brightness"] = brightness
         if color_temp is not None:
             payload["colorTemp"] = color_temp
-        return self._request("POST", self.endpoint_config.light_control, payload)
+        return self._request_any("POST", self.endpoint_config.light_control, payload=payload)
 
     def read_light_info(self, *, device_id: str) -> dict[str, Any]:
-        """读取灯光状态与参数。"""
-        return self._request(
-            "GET",
-            self.endpoint_config.light_read,
-            query={"deviceId": device_id},
-        )
+        return self._request_any("GET", self.endpoint_config.light_read, query={"deviceId": device_id})
 
-    # -------------------------------
-    # ENVIRONMENT
-    # -------------------------------
     def control_environment(
         self,
         *,
@@ -167,7 +146,6 @@ class MoquanClient:
         humidifier_on: bool | None = None,
         dehumidifier_on: bool | None = None,
     ) -> dict[str, Any]:
-        """环境控制：支持模式、目标值和执行器开关。"""
         payload: dict[str, Any] = {"deviceId": device_id}
         if mode is not None:
             payload["mode"] = mode
@@ -185,59 +163,42 @@ class MoquanClient:
             payload["humidifier"] = "on" if humidifier_on else "off"
         if dehumidifier_on is not None:
             payload["dehumidifier"] = "on" if dehumidifier_on else "off"
-        return self._request("POST", self.endpoint_config.environment_control, payload)
+        return self._request_any("POST", self.endpoint_config.environment_control, payload=payload)
 
     def read_environment_info(self, *, device_id: str) -> dict[str, Any]:
-        """读取环境传感信息，例如温湿度、光照、CO2 等。"""
-        return self._request(
-            "GET",
-            self.endpoint_config.environment_read,
-            query={"deviceId": device_id},
-        )
+        return self._request_any("GET", self.endpoint_config.environment_read, query={"deviceId": device_id})
 
     def read_environment_control_info(self, *, device_id: str) -> dict[str, Any]:
-        """读取环境控制配置和当前控制执行状态。"""
-        return self._request(
-            "GET",
-            self.endpoint_config.environment_control_read,
-            query={"deviceId": device_id},
-        )
+        return self._request_any("GET", self.endpoint_config.environment_control_read, query={"deviceId": device_id})
 
-    # -------------------------------
-    # WATER FERTILIZER
-    # -------------------------------
-    def control_water_fertilizer(
-        self,
-        *,
-        device_id: str,
-        irrigation_on: bool,
-        fertilizer_ratio: float | None = None,
-        duration_seconds: int | None = None,
-    ) -> dict[str, Any]:
-        """控制水肥系统状态，并可携带施肥比和执行时长。"""
-        payload: dict[str, Any] = {
-            "deviceId": device_id,
-            "irrigation": "on" if irrigation_on else "off",
-        }
+    def control_water_fertilizer(self, *, device_id: str, irrigation_on: bool, fertilizer_ratio: float | None = None, duration_seconds: int | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"deviceId": device_id, "irrigation": "on" if irrigation_on else "off"}
         if fertilizer_ratio is not None:
             payload["fertilizerRatio"] = fertilizer_ratio
         if duration_seconds is not None:
             payload["durationSeconds"] = duration_seconds
-        return self._request(
-            "POST",
-            self.endpoint_config.water_fertilizer_control,
-            payload,
-        )
+        return self._request_any("POST", self.endpoint_config.water_fertilizer_control, payload=payload)
 
     def read_water_fertilizer_info(self, *, device_id: str) -> dict[str, Any]:
-        """读取水肥系统信息，例如运行状态、流量、电导率等。"""
-        return self._request(
-            "GET",
-            self.endpoint_config.water_fertilizer_read,
-            query={"deviceId": device_id},
-        )
+        return self._request_any("GET", self.endpoint_config.water_fertilizer_read, query={"deviceId": device_id})
 
-    def _request(
+    def _request_any(
+        self,
+        method: str,
+        paths: list[str],
+        payload: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        last_error: Exception | None = None
+        for path in paths:
+            try:
+                return self._request_once(method=method, path=path, payload=payload, query=query)
+            except MoquanAPIError as exc:
+                last_error = exc
+                continue
+        raise MoquanAPIError(f"All endpoint candidates failed for {method} {paths}: {last_error}")
+
+    def _request_once(
         self,
         method: str,
         path: str,
@@ -268,10 +229,8 @@ class MoquanClient:
                 return json.loads(raw) if raw else {"status": "ok"}
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="ignore")
-            raise MoquanAPIError(
-                f"HTTP {exc.code} calling {url}: {body or exc.reason}"
-            ) from exc
+            raise MoquanAPIError(f"HTTP {exc.code} {url}: {body or exc.reason}") from exc
         except error.URLError as exc:
-            raise MoquanAPIError(f"Network error calling {url}: {exc.reason}") from exc
+            raise MoquanAPIError(f"Network error {url}: {exc.reason}") from exc
         except json.JSONDecodeError as exc:
             raise MoquanAPIError(f"Invalid JSON response from {url}") from exc
